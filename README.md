@@ -24,7 +24,7 @@ The app is using Parse as backend which is basically free. (Free plan: 20 GB Fil
 - Group chat functionality
 - Private chat functionality
 - Single or Multiple recipients
-- Full realtime actions - latency less than 100 ms - **[Premium only](http://relatedcode.com/realtimepremium)**
+- Full realtime actions - latency less than 100 ms
 - No backend programming needed
 - Native and easy to customize user interface
 - Push Notification support
@@ -37,31 +37,36 @@ The app is using Parse as backend which is basically free. (Free plan: 20 GB Fil
 - Sending videos
 - Sending audio messages - **[Premium only](http://relatedcode.com/realtimepremium)**
 - Sending location - **[Premium only](http://relatedcode.com/realtimepremium)**
-- Sending stickers (<i>new</i>) - **[Premium only](http://relatedcode.com/realtimepremium)**
-- Sending emojis
+- Sending stickers - **[Premium only](http://relatedcode.com/realtimepremium)**
+- Sending large emojis
+- Load earlier messages (<i>new</i>) - **[Premium only](http://relatedcode.com/realtimepremium)**
 - Typing indicator - **[Premium only](http://relatedcode.com/realtimepremium)**
 - Message delivery receipt - **[Premium only](http://relatedcode.com/realtimepremium)**
 - Message read receipt - **[Premium only](http://relatedcode.com/realtimepremium)**
-- Delete unread messages - **[Premium only](http://relatedcode.com/realtimepremium)**
-- Block user functionality (<i>new</i>) - **[Premium only](http://relatedcode.com/realtimepremium)**
-- Report user functionality (<i>new</i>) - **[Premium only](http://relatedcode.com/realtimepremium)**
-- Address Book access
+- Save picture message content to device (<i>new</i>) - **[Premium only](http://relatedcode.com/realtimepremium)**
+- Save video message content to device (<i>new</i>) - **[Premium only](http://relatedcode.com/realtimepremium)**
+- Save audio message content to device (<i>new</i>) - **[Premium only](http://relatedcode.com/realtimepremium)**
+- Delete read and unread messages - **[Premium only](http://relatedcode.com/realtimepremium)**
+- Block user functionality - **[Premium only](http://relatedcode.com/realtimepremium)**
+- Report user functionality - **[Premium only](http://relatedcode.com/realtimepremium)**
+- Address Book friend list
 - Invite functionality - SMS, email
-- Facebook friend list
+- Facebook friend list (list only registered users)
 - Recent view for ongoing chats
 - Map view for shared locations - **[Premium only](http://relatedcode.com/realtimepremium)**
 - Picture view for pictures
 - Basic Settings view included
-- Profile view for users (<i>new</i>)
-- Group settings view for groups (<i>new</i>)
-- Blocked view for blocked users (<i>new</i>)
+- Profile view for users
+- Group settings view for groups
+- Blocked view for blocked users
 - Privacy Policy view
 - Terms of Service view
 - In-app push notification settings (<i>coming soon</i>) - **[Premium only](http://relatedcode.com/realtimepremium)**
 - Facebook profile picture grabbed automatically
 - Twitter profile picture grabbed automatically (<i>coming soon</i>)
+- Picture, video and audio upload progress indicator
 - Video length limit possibility
-- Copy and paste messages
+- Copy and paste text messages
 - Send button is enabled/disabled automatically
 - Arbitrary message sizes
 - Data detectors - phone numbers, links, dates
