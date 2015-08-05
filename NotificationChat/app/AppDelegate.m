@@ -11,7 +11,8 @@
 
 #import <Parse/Parse.h>
 #import <ParseUI/ParseUI.h>
-#import <ParseFacebookUtils/PFFacebookUtils.h>
+#import <FBSDKCoreKit/FBSDKCoreKit.h>
+#import <ParseFacebookUtilsV4/PFFacebookUtils.h>
 
 #import "AppConstant.h"
 #import "common.h"
@@ -33,7 +34,7 @@
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	[PFTwitterUtils initializeWithConsumerKey:@"kS83MvJltZwmfoWVoyE1R6xko" consumerSecret:@"YXSupp9hC2m1rugTfoSyqricST9214TwYapQErBcXlP1BrSfND"];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	[PFFacebookUtils initializeFacebook];
+	[PFFacebookUtils initializeFacebookWithApplicationLaunchOptions:nil];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	if ([application respondsToSelector:@selector(registerUserNotificationSettings:)])
 	{
@@ -93,8 +94,9 @@
 - (void)applicationDidBecomeActive:(UIApplication *)application
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
+	[FBSDKAppEvents activateApp];
+	PostNotification(NOTIFICATION_APP_STARTED);
 	[self locationManagerStart];
-	[FBAppCall handleDidBecomeActiveWithSession:[PFFacebookUtils session]];
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
@@ -110,7 +112,7 @@
 - (BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	return [FBAppCall handleOpenURL:url sourceApplication:sourceApplication withSession:[PFFacebookUtils session]];
+	return [[FBSDKApplicationDelegate sharedInstance] application:application openURL:url sourceApplication:sourceApplication annotation:annotation];
 }
 
 #pragma mark - Push notification methods

@@ -11,7 +11,8 @@
 
 #import "AFNetworking.h"
 #import <Parse/Parse.h>
-#import <ParseFacebookUtils/PFFacebookUtils.h>
+#import <FBSDKCoreKit/FBSDKCoreKit.h>
+#import <ParseFacebookUtilsV4/PFFacebookUtils.h>
 #import "ProgressHUD.h"
 
 #import "AppConstant.h"
@@ -101,7 +102,9 @@
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
 	[ProgressHUD show:@"Signing in..." Interaction:NO];
-	[PFFacebookUtils logInWithPermissions:@[@"public_profile", @"email", @"user_friends"] block:^(PFUser *user, NSError *error)
+	//---------------------------------------------------------------------------------------------------------------------------------------------
+	NSArray *permissionsArray = @[@"public_profile", @"email", @"user_friends"];
+	[PFFacebookUtils logInInBackgroundWithReadPermissions:permissionsArray block:^(PFUser *user, NSError *error)
 	{
 		if (user != nil)
 		{
@@ -119,8 +122,8 @@
 - (void)requestFacebook:(PFUser *)user
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	FBRequest *request = [FBRequest requestForMe];
-	[request startWithCompletionHandler:^(FBRequestConnection *connection, id result, NSError *error)
+	FBSDKGraphRequest *request = [[FBSDKGraphRequest alloc] initWithGraphPath:@"me?fields=id,email,name" parameters:nil];
+	[request startWithCompletionHandler:^(FBSDKGraphRequestConnection *connection, id result, NSError *error)
 	{
 		if (error == nil)
 		{
@@ -163,9 +166,15 @@
 		{
 			if (error != nil) [ProgressHUD showError:@"Network error."];
 		}];
-		//-----------------------------------------------------------------------------------------------------------------------------------------
-		user[PF_USER_EMAILCOPY] = userData[@"email"];
-		user[PF_USER_FULLNAME] = userData[@"name"];
+		//---------------------------------------------------------------------------------------------------------------------------------------------
+		NSString *name = userData[@"name"];
+		NSString *email = userData[@"email"];
+		//---------------------------------------------------------------------------------------------------------------------------------------------
+		if (name == nil) name = @"";
+		if (email == nil) email = @"";
+		//---------------------------------------------------------------------------------------------------------------------------------------------
+		user[PF_USER_EMAILCOPY] = email;
+		user[PF_USER_FULLNAME] = name;
 		user[PF_USER_FULLNAME_LOWER] = [userData[@"name"] lowercaseString];
 		user[PF_USER_FACEBOOKID] = userData[@"id"];
 		user[PF_USER_PICTURE] = filePicture;
