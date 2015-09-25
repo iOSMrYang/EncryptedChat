@@ -12,7 +12,7 @@
 #import <Parse/Parse.h>
 #import "ProgressHUD.h"
 
-#import "AppConstant.h"
+#import "utilities.h"
 
 #import "SelectSingleView.h"
 
@@ -55,6 +55,13 @@
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
 	[super viewWillDisappear:animated];
+	[self dismissKeyboard];
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)dismissKeyboard
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
 	[self.view endEditing:YES];
 }
 
@@ -64,15 +71,13 @@
 - (void)loadUsers
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	PFUser *user = [PFUser currentUser];
-
 	PFQuery *query1 = [PFQuery queryWithClassName:PF_BLOCKED_CLASS_NAME];
-	[query1 whereKey:PF_BLOCKED_USER1 equalTo:user];
+	[query1 whereKey:PF_BLOCKED_USER1 equalTo:[PFUser currentUser]];
 
 	PFQuery *query2 = [PFQuery queryWithClassName:PF_USER_CLASS_NAME];
-	[query2 whereKey:PF_USER_OBJECTID notEqualTo:user.objectId];
+	[query2 whereKey:PF_USER_OBJECTID notEqualTo:[PFUser currentId]];
 	[query2 whereKey:PF_USER_OBJECTID doesNotMatchKey:PF_BLOCKED_USERID2 inQuery:query1];
-	[query2 orderByAscending:PF_USER_FULLNAME];
+	[query2 orderByAscending:PF_USER_FULLNAME_LOWER];
 	[query2 setLimit:1000];
 	[query2 findObjectsInBackgroundWithBlock:^(NSArray *objects, NSError *error)
 	{
@@ -90,16 +95,14 @@
 - (void)searchUsers:(NSString *)search_lower
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	PFUser *user = [PFUser currentUser];
-
 	PFQuery *query1 = [PFQuery queryWithClassName:PF_BLOCKED_CLASS_NAME];
-	[query1 whereKey:PF_BLOCKED_USER1 equalTo:user];
+	[query1 whereKey:PF_BLOCKED_USER1 equalTo:[PFUser currentUser]];
 
 	PFQuery *query2 = [PFQuery queryWithClassName:PF_USER_CLASS_NAME];
-	[query2 whereKey:PF_USER_OBJECTID notEqualTo:user.objectId];
+	[query2 whereKey:PF_USER_OBJECTID notEqualTo:[PFUser currentId]];
 	[query2 whereKey:PF_USER_OBJECTID doesNotMatchKey:PF_BLOCKED_USERID2 inQuery:query1];
 	[query2 whereKey:PF_USER_FULLNAME_LOWER containsString:search_lower];
-	[query2 orderByAscending:PF_USER_FULLNAME];
+	[query2 orderByAscending:PF_USER_FULLNAME_LOWER];
 	[query2 setLimit:1000];
 	[query2 findObjectsInBackgroundWithBlock:^(NSArray *objects, NSError *error)
 	{
@@ -120,6 +123,15 @@
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
 	[self dismissViewControllerAnimated:YES completion:nil];
+}
+
+#pragma mark - UIScrollViewDelegate
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	[self dismissKeyboard];
 }
 
 #pragma mark - Table view data source

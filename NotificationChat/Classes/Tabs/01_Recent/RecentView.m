@@ -10,14 +10,14 @@
 // THE SOFTWARE.
 
 #import <Parse/Parse.h>
+#import <Firebase/Firebase.h>
 #import "ProgressHUD.h"
 
-#import "AppConstant.h"
-#import "common.h"
-#import "recent.h"
+#import "utilities.h"
 
 #import "RecentView.h"
 #import "RecentCell.h"
+#import "MapsView.h"
 #import "ChatView.h"
 #import "SelectSingleView.h"
 #import "SelectMultipleView.h"
@@ -28,6 +28,7 @@
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 @interface RecentView()
 {
+	Firebase *firebase;
 	NSMutableArray *recents;
 }
 @end
@@ -44,6 +45,8 @@
 		[self.tabBarItem setImage:[UIImage imageNamed:@"tab_recent"]];
 		self.tabBarItem.title = @"Recent";
 		//-----------------------------------------------------------------------------------------------------------------------------------------
+		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(loadRecents) name:NOTIFICATION_APP_STARTED object:nil];
+		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(loadRecents) name:NOTIFICATION_USER_LOGGED_IN object:nil];
 		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(actionCleanup) name:NOTIFICATION_USER_LOGGED_OUT object:nil];
 	}
 	return self;
@@ -56,13 +59,13 @@
 	[super viewDidLoad];
 	self.title = @"Recent";
 	//---------------------------------------------------------------------------------------------------------------------------------------------
+	self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Maps" style:UIBarButtonItemStylePlain target:self
+																						   action:@selector(actionMaps)];
+	//---------------------------------------------------------------------------------------------------------------------------------------------
 	self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCompose target:self
 																						   action:@selector(actionCompose)];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	[self.tableView registerNib:[UINib nibWithNibName:@"RecentCell" bundle:nil] forCellReuseIdentifier:@"RecentCell"];
-	//---------------------------------------------------------------------------------------------------------------------------------------------
-	self.refreshControl = [[UIRefreshControl alloc] init];
-	[self.refreshControl addTarget:self action:@selector(loadRecents) forControlEvents:UIControlEventValueChanged];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	recents = [[NSMutableArray alloc] init];
 }
@@ -75,7 +78,7 @@
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	if ([PFUser currentUser] != nil)
 	{
-		[self loadRecents];
+
 	}
 	else LoginUser(self);
 }
@@ -86,22 +89,32 @@
 - (void)loadRecents
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	PFQuery *query = [PFQuery queryWithClassName:PF_RECENT_CLASS_NAME];
-	[query whereKey:PF_RECENT_USER equalTo:[PFUser currentUser]];
-	[query includeKey:PF_RECENT_LASTUSER];
-	[query orderByDescending:PF_RECENT_UPDATEDACTION];
-	[query findObjectsInBackgroundWithBlock:^(NSArray *objects, NSError *error)
+	if (([PFUser currentUser] != nil) && (firebase == nil))
 	{
-		if (error == nil)
+		firebase = [[Firebase alloc] initWithUrl:[NSString stringWithFormat:@"%@/Recent", FIREBASE]];
+		FQuery *query = [[firebase queryOrderedByChild:@"userId"] queryEqualToValue:[PFUser currentId]];
+		[query observeEventType:FEventTypeValue withBlock:^(FDataSnapshot *snapshot)
 		{
 			[recents removeAllObjects];
-			[recents addObjectsFromArray:objects];
+			if (snapshot.value != [NSNull null])
+			{
+				NSArray *sorted = [[snapshot.value allValues] sortedArrayUsingComparator:^NSComparisonResult(id obj1, id obj2)
+				{
+					NSDictionary *recent1 = (NSDictionary *)obj1;
+					NSDictionary *recent2 = (NSDictionary *)obj2;
+					NSDate *date1 = String2Date(recent1[@"date"]);
+					NSDate *date2 = String2Date(recent2[@"date"]);
+					return [date2 compare:date1];
+				}];
+				for (NSDictionary *recent in sorted)
+				{
+					[recents addObject:recent];
+				}
+			}
 			[self.tableView reloadData];
 			[self updateTabCounter];
-		}
-		else [ProgressHUD showError:@"Network error."];
-		[self.refreshControl endRefreshing];
-	}];
+		}];
+	}
 }
 
 #pragma mark - Helper methods
@@ -113,13 +126,29 @@
 	int total = 0;
 	for (PFObject *recent in recents)
 	{
-		total += [recent[PF_RECENT_COUNTER] intValue];
+		total += [recent[@"counter"] intValue];
 	}
 	UITabBarItem *item = self.tabBarController.tabBar.items[0];
 	item.badgeValue = (total == 0) ? nil : [NSString stringWithFormat:@"%d", total];
+	//---------------------------------------------------------------------------------------------------------------------------------------------
+	[UIApplication sharedApplication].applicationIconBadgeNumber = total;
+	//---------------------------------------------------------------------------------------------------------------------------------------------
+	PFInstallation *currentInstallation = [PFInstallation currentInstallation];
+	currentInstallation.badge = total;
+	[currentInstallation saveInBackground];
 }
 
 #pragma mark - User actions
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)actionMaps
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	MapsView *mapsView = [[MapsView alloc] init];
+	mapsView.delegate = self;
+	NavigationController *navController = [[NavigationController alloc] initWithRootViewController:mapsView];
+	[self presentViewController:navController animated:YES completion:nil];
+}
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 - (void)actionChat:(NSString *)groupId
@@ -134,6 +163,8 @@
 - (void)actionCleanup
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
+	[firebase removeAllObservers];
+	firebase = nil;
 	[recents removeAllObjects];
 	[self.tableView reloadData];
 	[self updateTabCounter];
@@ -144,7 +175,7 @@
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
 	UIActionSheet *action = [[UIActionSheet alloc] initWithTitle:nil delegate:self cancelButtonTitle:@"Cancel" destructiveButtonTitle:nil
-			   otherButtonTitles:@"Single recipient", @"Multiple recipients", @"Address Book", @"Facebook Friends", nil];
+			   otherButtonTitles:@"Single recipient", @"Multiple recipients", @"Address Book", @"Facebook Friends", @"Select by Distance", nil];
 	[action showFromTabBar:[[self tabBarController] tabBar]];
 }
 
@@ -184,7 +215,25 @@
 			NavigationController *navController = [[NavigationController alloc] initWithRootViewController:facebookFriendsView];
 			[self presentViewController:navController animated:YES completion:nil];
 		}
+		if (buttonIndex == 4)
+		{
+			SelectDistanceView *selectDistanceView = [[SelectDistanceView alloc] init];
+			selectDistanceView.delegate = self;
+			NavigationController *navController = [[NavigationController alloc] initWithRootViewController:selectDistanceView];
+			[self presentViewController:navController animated:YES completion:nil];
+		}
 	}
+}
+
+#pragma mark - MapsDelegate
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)didSelectMapsUser:(PFUser *)user2
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	PFUser *user1 = [PFUser currentUser];
+	NSString *groupId = StartPrivateChat(user1, user2);
+	[self actionChat:groupId];
 }
 
 #pragma mark - SelectSingleDelegate
@@ -230,6 +279,17 @@
 	[self actionChat:groupId];
 }
 
+#pragma mark - SelectDistanceDelegate
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)didSelectDistanceUser:(PFUser *)user2
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	PFUser *user1 = [PFUser currentUser];
+	NSString *groupId = StartPrivateChat(user1, user2);
+	[self actionChat:groupId];
+}
+
 #pragma mark - Table view data source
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
@@ -266,16 +326,13 @@
 - (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	PFObject *recent = recents[indexPath.row];
+	NSDictionary *recent = recents[indexPath.row];
 	[recents removeObject:recent];
 	[self updateTabCounter];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	[recent deleteInBackgroundWithBlock:^(BOOL succeeded, NSError *error)
-	{
-		if (error != nil) [ProgressHUD showError:@"Network error."];
-	}];
-	//---------------------------------------------------------------------------------------------------------------------------------------------
 	[self.tableView deleteRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationFade];
+	//---------------------------------------------------------------------------------------------------------------------------------------------
+	DeleteRecentItem(recent);
 }
 
 #pragma mark - Table view delegate
@@ -286,8 +343,9 @@
 {
 	[tableView deselectRowAtIndexPath:indexPath animated:YES];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	PFObject *recent = recents[indexPath.row];
-	[self actionChat:recent[PF_RECENT_GROUPID]];
+	NSDictionary *recent = recents[indexPath.row];
+	RestartRecentChat(recent);
+	[self actionChat:recent[@"groupId"]];
 }
 
 @end

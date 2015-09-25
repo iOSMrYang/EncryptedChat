@@ -13,6 +13,8 @@
 #import <ParseUI/ParseUI.h>
 #import <FBSDKCoreKit/FBSDKCoreKit.h>
 #import <ParseFacebookUtilsV4/PFFacebookUtils.h>
+#import <ParseTwitterUtils/ParseTwitterUtils.h>
+#import "CLLocation+Utils.h"
 
 #import "AppConstant.h"
 #import "common.h"
@@ -30,7 +32,7 @@
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	[Parse setApplicationId:@"xBp25kiePJTYHs3EvMqo0e0eJhp7CbYKnKKmt0Xm" clientKey:@"sBmxHC1OUqU1gg4AbAOWCJiQrvTx9MKgPS6SgsJW"];
+	[Parse setApplicationId:@"yTQEwFqPlJ6XBhLDM9fQS2ow1lN1TW3CDcxfped8" clientKey:@"QINEUgjoc2od8fbJfFplR7d7YcTfgUdSvOBTRR6P"];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	[PFTwitterUtils initializeWithConsumerKey:@"kS83MvJltZwmfoWVoyE1R6xko" consumerSecret:@"YXSupp9hC2m1rugTfoSyqricST9214TwYapQErBcXlP1BrSfND"];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
@@ -48,23 +50,28 @@
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
 
-	self.recentView = [[RecentView alloc] init];
-	self.groupsView = [[GroupsView alloc] init];
-	self.peopleView = [[PeopleView alloc] init];
-	self.settingsView = [[SettingsView alloc] init];
+	self.recentView = [[RecentView alloc] initWithNibName:@"RecentView" bundle:nil];
+	self.groupsView = [[GroupsView alloc] initWithNibName:@"GroupsView" bundle:nil];
+	self.peopleView = [[PeopleView alloc] initWithNibName:@"PeopleView" bundle:nil];
+	self.settingsView = [[SettingsView alloc] initWithNibName:@"SettingsView" bundle:nil];
 
 	NavigationController *navController1 = [[NavigationController alloc] initWithRootViewController:self.recentView];
-	NavigationController *navController2 = [[NavigationController alloc] initWithRootViewController:self.groupsView];
-	NavigationController *navController3 = [[NavigationController alloc] initWithRootViewController:self.peopleView];
-	NavigationController *navController4 = [[NavigationController alloc] initWithRootViewController:self.settingsView];
+	NavigationController *navController3 = [[NavigationController alloc] initWithRootViewController:self.groupsView];
+	NavigationController *navController4 = [[NavigationController alloc] initWithRootViewController:self.peopleView];
+	NavigationController *navController5 = [[NavigationController alloc] initWithRootViewController:self.settingsView];
 
 	self.tabBarController = [[UITabBarController alloc] init];
-	self.tabBarController.viewControllers = [NSArray arrayWithObjects:navController1, navController2, navController3, navController4, nil];
+	self.tabBarController.viewControllers = @[navController1, navController3, navController4, navController5];
 	self.tabBarController.tabBar.translucent = NO;
 	self.tabBarController.selectedIndex = DEFAULT_TAB;
 
 	self.window.rootViewController = self.tabBarController;
 	[self.window makeKeyAndVisible];
+	//---------------------------------------------------------------------------------------------------------------------------------------------
+	[self.recentView view];
+	[self.groupsView view];
+	[self.peopleView view];
+	[self.settingsView view];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	return YES;
 }
@@ -138,18 +145,6 @@
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
 	//[PFPush handlePush:userInfo];
-	//---------------------------------------------------------------------------------------------------------------------------------------------
-	if ([PFUser currentUser] != nil)
-	{
-		[self performSelector:@selector(refreshRecentView) withObject:nil afterDelay:4.0];
-	}
-}
-
-//-------------------------------------------------------------------------------------------------------------------------------------------------
-- (void)refreshRecentView
-//-------------------------------------------------------------------------------------------------------------------------------------------------
-{
-	[self.recentView loadRecents];
 }
 
 #pragma mark - Location manager methods
@@ -182,6 +177,22 @@
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
 	self.coordinate = newLocation.coordinate;
+	//---------------------------------------------------------------------------------------------------------------------------------------------
+	PFUser *user = [PFUser currentUser];
+	if (user != nil)
+	{
+		PFGeoPoint *geoPoint = user[PF_USER_LOCATION];
+		CLLocation *locationUser = [[CLLocation alloc] initWithLatitude:geoPoint.latitude longitude:geoPoint.longitude];
+		double distance = [newLocation pythagorasEquirectangularDistanceFromLocation:locationUser];
+		if (distance > 100)
+		{
+			user[PF_USER_LOCATION] = [PFGeoPoint geoPointWithLocation:newLocation];
+			[user saveInBackgroundWithBlock:^(BOOL succeeded, NSError *error)
+			{
+				if (error != nil) NSLog(@"AppDelegate didUpdateToLocation network error.");
+			}];
+		}
+	}
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------

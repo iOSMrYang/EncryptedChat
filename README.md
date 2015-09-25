@@ -2,9 +2,9 @@
 
 ## OVERVIEW
 
-This is a full native iPhone app to create realtime, text based group or private chat with Parse.
+This is a full native iPhone app to create realtime, text based group or private chat with Parse and Firebase.
 
-![Chat](http://relatedcode.com/github/chat817.png)
+![Chat](http://relatedcode.com/github/chat821.png)
 .
 ![Chat](http://relatedcode.com/github/chat803.png)
 .
@@ -12,11 +12,9 @@ This is a full native iPhone app to create realtime, text based group or private
 
 ![Chat](http://relatedcode.com/github/chat804.png)
 .
-![Chat](http://relatedcode.com/github/chat806.png)
+![Chat](http://relatedcode.com/github/chat820.png)
 .
 ![Chat](http://relatedcode.com/github/chat819.png)
-
-The app is using Parse as backend which is basically free. (Free plan: 20 GB File Storage, 20 GB Database Storage, 2 TB Data Transfer, 30 req/s).
 
 ## FEATURES
 
@@ -52,7 +50,7 @@ The app is using Parse as backend which is basically free. (Free plan: 20 GB Fil
 - Address Book friend list
 - Invite functionality - SMS, email
 - Facebook friend list (list only registered users)
-- Recent view for ongoing chats
+- Realtime recent view for ongoing chats
 - Map view for shared locations - **[Premium only](http://relatedcode.com/realtimepremium)**
 - Picture view for pictures
 - Basic Settings view included
@@ -85,7 +83,6 @@ The app is using Parse as backend which is basically free. (Free plan: 20 GB Fil
 .
 ![Chat](http://relatedcode.com/github/chat812.png)
 
-
 ## REQUIREMENTS
 
 - Xcode 6
@@ -110,14 +107,14 @@ More info about how to [install](https://developers.facebook.com/docs/ios/gettin
 
 **4.,** You also need several external libraries which are included. But if you need, you can download them from here:
 
-https://github.com/AFNetworking/AFNetworking<br>
 https://github.com/ideaismobile/IDMPhotoBrowser<br>
 https://github.com/jessesquires/JSQMessagesViewController<br>
 https://github.com/jessesquires/JSQSystemSoundPlayer<br>
 https://github.com/relatedcode/ProgressHUD<br>
 https://github.com/rnystrom/RNGridMenu<br>
+https://github.com/rs/SDWebImage<br>
 
-To use these libraries, just add AFNetworking, IDMPhotoBrowser, JSQMessagesViewController, JSQSystemSoundPlayer, ProgressHUD and RNGridMenu directories to your project.
+To use these libraries, just add IDMPhotoBrowser, JSQMessagesViewController, JSQSystemSoundPlayer, ProgressHUD, RNGridMenu and SDWebImage directories to your project.
 
 **5.,** You need to [register](https://developers.facebook.com/apps) your app at Facebook. More info about how to [configure](https://developers.facebook.com/docs/ios/getting-started) Facebook.
 
@@ -128,6 +125,16 @@ To use these libraries, just add AFNetworking, IDMPhotoBrowser, JSQMessagesViewC
 **8.,** Please replace the existing Parse account details in *AppDelegate.m*.
 
 **9.,** Please replace the existing Facebook account details in *Info.plist*.
+
+**10.,** You also need the latest Firebase SDK. (Already included, but you can download from [here](https://www.firebase.com/docs/ios/quickstart.html#section-download)).
+
+To add Firebase.framework just unzip the downloaded file and drag the Firebase.framework folder into your Xcode project under 'Frameworks'.
+
+More info about how to [install](https://www.firebase.com/docs/ios/quickstart.html#section-install) Firebase SDK.
+
+**11.,** You need to use your own [Firebase account](https://www.firebase.com/signup).
+
+**12.,** Please replace the existing Firebase account details in *AppConstant.h*.
 
 
 ## CONTACT

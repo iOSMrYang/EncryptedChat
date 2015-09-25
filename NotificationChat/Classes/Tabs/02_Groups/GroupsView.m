@@ -11,12 +11,8 @@
 
 #import <Parse/Parse.h>
 #import "ProgressHUD.h"
-#import "PFUser+Util.h"
 
-#import "AppConstant.h"
-#import "common.h"
-#import "group.h"
-#import "recent.h"
+#import "utilities.h"
 
 #import "GroupsView.h"
 #import "CreateGroupView.h"
@@ -83,10 +79,8 @@
 - (void)loadGroups
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	PFUser *user = [PFUser currentUser];
-
 	PFQuery *query = [PFQuery queryWithClassName:PF_GROUP_CLASS_NAME];
-	[query whereKey:PF_GROUP_MEMBERS equalTo:user.objectId];
+	[query whereKey:PF_GROUP_MEMBERS equalTo:[PFUser currentId]];
 	[query findObjectsInBackgroundWithBlock:^(NSArray *objects, NSError *error)
 	{
 		if (error == nil)
@@ -168,7 +162,7 @@
 	PFUser *user1 = [PFUser currentUser];
 	PFUser *user2 = group[PF_GROUP_USER];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	if ([user1 isEqualTo:user2]) RemoveGroupItem(group); else RemoveGroupMember(group, user1);
+	if ([user1 isEqualTo:user2]) GroupDelete(group); else GroupRemoveMember(group, user1);
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	[self.tableView deleteRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationFade];
 }

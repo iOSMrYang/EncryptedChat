@@ -12,7 +12,7 @@
 #import <Parse/Parse.h>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
-@interface GroupSettingsView : UITableViewController
+@interface GroupSettingsView : UITableViewController <UIActionSheetDelegate, UIAlertViewDelegate>
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 
 - (id)initWith:(PFObject *)group_;

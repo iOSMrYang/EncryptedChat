@@ -11,15 +11,11 @@
 
 #import <Parse/Parse.h>
 #import "ProgressHUD.h"
-#import "PFUser+Util.h"
 
-#import "AppConstant.h"
-#import "common.h"
-#import "people.h"
-#import "recent.h"
+#import "utilities.h"
 
 #import "PeopleView.h"
-#import "ChatView.h"
+#import "ProfileView.h"
 #import "SelectSingleView.h"
 #import "SelectMultipleView.h"
 #import "AddressBookView.h"
@@ -82,7 +78,7 @@
 	else LoginUser(self);
 }
 
-#pragma mark - User actions
+#pragma mark - Backend methods
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 - (void)loadPeople
@@ -340,16 +336,13 @@
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
 	[tableView deselectRowAtIndexPath:indexPath animated:YES];
-	PFUser *user1 = [PFUser currentUser];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	NSMutableArray *userstemp = sections[indexPath.section];
-	PFUser *user2 = userstemp[indexPath.row];
+	PFUser *user = userstemp[indexPath.row];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	NSString *groupId = StartPrivateChat(user1, user2);
-	//---------------------------------------------------------------------------------------------------------------------------------------------
-	ChatView *chatView = [[ChatView alloc] initWith:groupId];
-	chatView.hidesBottomBarWhenPushed = YES;
-	[self.navigationController pushViewController:chatView animated:YES];
+	ProfileView *profileView = [[ProfileView alloc] initWith:nil User:user];
+	profileView.hidesBottomBarWhenPushed = YES;
+	[self.navigationController pushViewController:profileView animated:YES];
 }
 
 @end

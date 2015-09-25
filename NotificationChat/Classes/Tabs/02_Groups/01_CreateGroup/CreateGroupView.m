@@ -11,10 +11,8 @@
 
 #import <Parse/Parse.h>
 #import "ProgressHUD.h"
-#import "PFUser+Util.h"
 
-#import "AppConstant.h"
-#import "common.h"
+#import "utilities.h"
 
 #import "CreateGroupView.h"
 
@@ -158,8 +156,7 @@
 	if ([name length] == 0)		{ [ProgressHUD showError:@"Group name must be set."]; return; }
 	if ([selection count] == 0) { [ProgressHUD showError:@"Please select some users."]; return; }
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	PFUser *user = [PFUser currentUser];
-	[selection addObject:user.objectId];
+	[selection addObject:[PFUser currentId]];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	PFObject *object = [PFObject objectWithClassName:PF_GROUP_CLASS_NAME];
 	object[PF_GROUP_USER] = [PFUser currentUser];
@@ -173,6 +170,15 @@
 		}
 		else [ProgressHUD showError:@"Network error."];
 	}];
+}
+
+#pragma mark - UIScrollViewDelegate
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	[self dismissKeyboard];
 }
 
 #pragma mark - Table view data source

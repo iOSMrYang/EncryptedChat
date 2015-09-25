@@ -11,13 +11,12 @@
 
 #import <Parse/Parse.h>
 #import "ProgressHUD.h"
-#import "PFUser+Util.h"
 
-#import "AppConstant.h"
-#import "recent.h"
+#import "utilities.h"
 
 #import "GroupSettingsView.h"
 #import "ChatView.h"
+#import "ProfileView.h"
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 @interface GroupSettingsView()
@@ -54,9 +53,19 @@
 	[super viewDidLoad];
 	self.title = @"Group Settings";
 	//---------------------------------------------------------------------------------------------------------------------------------------------
+	self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"groupsettings_more"]
+																	  style:UIBarButtonItemStylePlain target:self action:@selector(actionMore)];
+	//---------------------------------------------------------------------------------------------------------------------------------------------
 	users = [[NSMutableArray alloc] init];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	[self loadGroup];
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)viewWillAppear:(BOOL)animated
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	[super viewWillAppear:animated];
 	[self loadUsers];
 }
 
@@ -75,7 +84,7 @@
 {
 	PFQuery *query = [PFQuery queryWithClassName:PF_USER_CLASS_NAME];
 	[query whereKey:PF_USER_OBJECTID containedIn:group[PF_GROUP_MEMBERS]];
-	[query orderByAscending:PF_USER_FULLNAME];
+	[query orderByAscending:PF_USER_FULLNAME_LOWER];
 	[query setLimit:1000];
 	[query findObjectsInBackgroundWithBlock:^(NSArray *objects, NSError *error)
 	{
@@ -92,12 +101,80 @@
 #pragma mark - User actions
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)actionMore
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	UIActionSheet *action = [[UIActionSheet alloc] initWithTitle:nil delegate:self cancelButtonTitle:@"Cancel"
+										  destructiveButtonTitle:nil otherButtonTitles:@"Rename group", @"Add members", nil];
+	[action showInView:self.view];
+}
+
+#pragma mark - UIActionSheetDelegate
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)actionSheet:(UIActionSheet *)actionSheet clickedButtonAtIndex:(NSInteger)buttonIndex
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	if (buttonIndex != actionSheet.cancelButtonIndex)
+	{
+		if (buttonIndex == 0) [self actionRenameGroup];
+		if (buttonIndex == 1) [self actionAddMembers];
+	}
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)actionRenameGroup
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Rename Group" message:@"Enter a new name for this Group" delegate:self
+										  cancelButtonTitle:@"Cancel" otherButtonTitles:@"Save", nil];
+	alert.alertViewStyle = UIAlertViewStylePlainTextInput;
+	UITextField *textField = [alert textFieldAtIndex:0];
+	NSDictionary *attributes = @{NSForegroundColorAttributeName:[UIColor lightGrayColor]};
+	textField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"Name" attributes:attributes];
+	[alert show];
+}
+
+#pragma mark - UIAlertViewDelegate
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	if (buttonIndex != alertView.cancelButtonIndex)
+	{
+		UITextField *textField = [alertView textFieldAtIndex:0];
+		NSString *name = textField.text;
+		if ([name length] != 0)
+		{
+			group[PF_GROUP_NAME] = name;
+			[group saveInBackgroundWithBlock:^(BOOL succeeded, NSError *error)
+			{
+				if (error == nil)
+				{
+					labelName.text = name;
+				}
+				else [ProgressHUD showError:@"Network error."];
+			}];
+		}
+		else [ProgressHUD showError:@"Group name must be specified."];
+	}
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)actionAddMembers
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	NSLog(@"actionAddMembers");
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
 - (void)actionChat
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
 	NSString *groupId = group.objectId;
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	CreateRecentItem([PFUser currentUser], groupId, group[PF_GROUP_MEMBERS], group[PF_GROUP_NAME]);
+	StartGroupChat(group, users);
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	ChatView *chatView = [[ChatView alloc] initWith:groupId];
 	[self.navigationController pushViewController:chatView animated:YES];
@@ -157,6 +234,16 @@
 	[tableView deselectRowAtIndexPath:indexPath animated:YES];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	if ((indexPath.section == 0) && (indexPath.row == 0)) [self actionChat];
+	//---------------------------------------------------------------------------------------------------------------------------------------------
+	if (indexPath.section == 1)
+	{
+		PFUser *user = users[indexPath.row];
+		if ([user isEqualTo:[PFUser currentUser]] == NO)
+		{
+			ProfileView *profileView = [[ProfileView alloc] initWith:nil User:user];
+			[self.navigationController pushViewController:profileView animated:YES];
+		}
+	}
 }
 
 @end

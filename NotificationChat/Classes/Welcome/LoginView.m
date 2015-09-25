@@ -12,8 +12,7 @@
 #import <Parse/Parse.h>
 #import "ProgressHUD.h"
 
-#import "AppConstant.h"
-#import "push.h"
+#import "utilities.h"
 
 #import "LoginView.h"
 
@@ -80,6 +79,7 @@
 		if (user != nil)
 		{
 			ParsePushUserAssign();
+			PostNotification(NOTIFICATION_USER_LOGGED_IN);
 			[ProgressHUD showSuccess:[NSString stringWithFormat:@"Welcome back %@!", user[PF_USER_FULLNAME]]];
 			[self dismissViewControllerAnimated:YES completion:nil];
 		}

@@ -13,7 +13,13 @@
 #define HEXCOLOR(c) [UIColor colorWithRed:((c>>24)&0xFF)/255.0 green:((c>>16)&0xFF)/255.0 blue:((c>>8)&0xFF)/255.0 alpha:((c)&0xFF)/255.0]
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
+#define		FIREBASE							@"https://realtime64.firebaseio.com"
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
 #define		DEFAULT_TAB							0
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+#define		INSERT_MESSAGES						10
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 #define		VIDEO_LENGTH						5
@@ -21,6 +27,10 @@
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 #define		COLOR_OUTGOING						HEXCOLOR(0x007AFFFF)
 #define		COLOR_INCOMING						HEXCOLOR(0xE6E5EAFF)
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+#define		TEXT_DELIVERED						@"Delivered"
+#define		TEXT_READ							@"Read"
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 #define		SCREEN_WIDTH						[UIScreen mainScreen].bounds.size.width
@@ -49,6 +59,7 @@
 #define		PF_USER_FACEBOOKID					@"facebookId"			//	String
 #define		PF_USER_PICTURE						@"picture"				//	File
 #define		PF_USER_THUMBNAIL					@"thumbnail"			//	File
+#define		PF_USER_LOCATION					@"location"				//	GeoPoint
 //-----------------------------------------------------------------------
 #define		PF_BLOCKED_CLASS_NAME				@"Blocked"				//	Class name
 #define		PF_BLOCKED_USER						@"user"					//	Pointer to User Class
@@ -61,27 +72,9 @@
 #define		PF_GROUP_NAME						@"name"					//	String
 #define		PF_GROUP_MEMBERS					@"members"				//	Array
 //-----------------------------------------------------------------------
-#define		PF_MESSAGE_CLASS_NAME				@"Message"				//	Class name
-#define		PF_MESSAGE_USER						@"user"					//	Pointer to User Class
-#define		PF_MESSAGE_GROUPID					@"groupId"				//	String
-#define		PF_MESSAGE_TEXT						@"text"					//	String
-#define		PF_MESSAGE_PICTURE					@"picture"				//	File
-#define		PF_MESSAGE_VIDEO					@"video"				//	File
-#define		PF_MESSAGE_CREATEDAT				@"createdAt"			//	Date
-//-----------------------------------------------------------------------
 #define		PF_PEOPLE_CLASS_NAME				@"People"				//	Class name
 #define		PF_PEOPLE_USER1						@"user1"				//	Pointer to User Class
 #define		PF_PEOPLE_USER2						@"user2"				//	Pointer to User Class
-//-----------------------------------------------------------------------
-#define		PF_RECENT_CLASS_NAME				@"Recent"				//	Class name
-#define		PF_RECENT_USER						@"user"					//	Pointer to User Class
-#define		PF_RECENT_GROUPID					@"groupId"				//	String
-#define		PF_RECENT_MEMBERS					@"members"				//	Array
-#define		PF_RECENT_DESCRIPTION				@"description"			//	String
-#define		PF_RECENT_LASTUSER					@"lastUser"				//	Pointer to User Class
-#define		PF_RECENT_LASTMESSAGE				@"lastMessage"			//	String
-#define		PF_RECENT_COUNTER					@"counter"				//	Number
-#define		PF_RECENT_UPDATEDACTION				@"updatedAction"		//	Date
 //-----------------------------------------------------------------------
 #define		PF_REPORT_CLASS_NAME				@"Report"				//	Class name
 #define		PF_REPORT_USER1						@"user1"				//	Pointer to User Class

@@ -13,14 +13,9 @@
 #import <ParseUI/ParseUI.h>
 #import "ProgressHUD.h"
 
-#import "AppConstant.h"
-#import "camera.h"
-#import "common.h"
-#import "image.h"
-#import "push.h"
+#import "utilities.h"
 
 #import "SettingsView.h"
-#import "BlockedView.h"
 #import "PrivacyView.h"
 #import "TermsView.h"
 #import "NavigationController.h"
@@ -105,9 +100,7 @@
 - (void)actionBlocked
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	BlockedView *blockedView = [[BlockedView alloc] init];
-	blockedView.hidesBottomBarWhenPushed = YES;
-	[self.navigationController pushViewController:blockedView animated:YES];
+	ActionPremium(self);
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
@@ -176,8 +169,8 @@
 {
 	UIImage *image = info[UIImagePickerControllerEditedImage];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	UIImage *picture = ResizeImage(image, 280, 280);
-	UIImage *thumbnail = ResizeImage(image, 60, 60);
+	UIImage *picture = ResizeImage(image, 140, 140, 1);
+	UIImage *thumbnail = ResizeImage(image, 60, 60, 1);
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	imageUser.image = picture;
 	//---------------------------------------------------------------------------------------------------------------------------------------------

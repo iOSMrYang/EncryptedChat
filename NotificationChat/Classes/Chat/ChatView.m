@@ -12,35 +12,39 @@
 #import <MediaPlayer/MediaPlayer.h>
 
 #import <Parse/Parse.h>
-#import "ProgressHUD.h"
+#import <Firebase/Firebase.h>
 #import "IDMPhotoBrowser.h"
+#import "ProgressHUD.h"
 #import "RNGridMenu.h"
 
-#import "AppConstant.h"
-#import "camera.h"
-#import "common.h"
-#import "image.h"
-#import "push.h"
-#import "recent.h"
-#import "video.h"
+#import "utilities.h"
 
+#import "Incoming.h"
+#import "Outgoing.h"
+
+#import "AudioMediaItem.h"
 #import "PhotoMediaItem.h"
 #import "VideoMediaItem.h"
 
 #import "ChatView.h"
 #import "ProfileView.h"
+#import "NavigationController.h"
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 @interface ChatView()
 {
-	NSTimer *timer;
-	BOOL isLoading;
-	BOOL initialized;
-
 	NSString *groupId;
 
-	NSMutableArray *users;
+	BOOL initialized;
+	int typingCounter;
+
+	Firebase *firebase1;
+	Firebase *firebase2;
+
+	NSMutableArray *items;
 	NSMutableArray *messages;
+
+	NSMutableDictionary *started;
 	NSMutableDictionary *avatars;
 
 	JSQMessagesBubbleImage *bubbleImageOutgoing;
@@ -68,13 +72,13 @@
 	[super viewDidLoad];
 	self.title = @"Chat";
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	users = [[NSMutableArray alloc] init];
+	items = [[NSMutableArray alloc] init];
 	messages = [[NSMutableArray alloc] init];
+	started = [[NSMutableDictionary alloc] init];
 	avatars = [[NSMutableDictionary alloc] init];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	PFUser *user = [PFUser currentUser];
-	self.senderId = user.objectId;
-	self.senderDisplayName = user[PF_USER_FULLNAME];
+	self.senderId = [PFUser currentId];
+	self.senderDisplayName = [PFUser currentName];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	JSQMessagesBubbleImageFactory *bubbleFactory = [[JSQMessagesBubbleImageFactory alloc] init];
 	bubbleImageOutgoing = [bubbleFactory outgoingMessagesBubbleImageWithColor:COLOR_OUTGOING];
@@ -82,8 +86,18 @@
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	avatarImageBlank = [JSQMessagesAvatarImageFactory avatarImageWithImage:[UIImage imageNamed:@"chat_blank"] diameter:30.0];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	isLoading = NO;
-	initialized = NO;
+	[JSQMessagesCollectionViewCell registerMenuAction:@selector(actionCopy:)];
+	[JSQMessagesCollectionViewCell registerMenuAction:@selector(actionDelete:)];
+	[JSQMessagesCollectionViewCell registerMenuAction:@selector(actionSave:)];
+	//---------------------------------------------------------------------------------------------------------------------------------------------
+	UIMenuItem *menuItemCopy = [[UIMenuItem alloc] initWithTitle:@"Copy" action:@selector(actionCopy:)];
+	UIMenuItem *menuItemDelete = [[UIMenuItem alloc] initWithTitle:@"Delete" action:@selector(actionDelete:)];
+	UIMenuItem *menuItemSave = [[UIMenuItem alloc] initWithTitle:@"Save" action:@selector(actionSave:)];
+	[UIMenuController sharedMenuController].menuItems = @[menuItemCopy, menuItemDelete, menuItemSave];
+	//---------------------------------------------------------------------------------------------------------------------------------------------
+	firebase1 = [[Firebase alloc] initWithUrl:[NSString stringWithFormat:@"%@/Message/%@", FIREBASE, groupId]];
+	firebase2 = [[Firebase alloc] initWithUrl:[NSString stringWithFormat:@"%@/Typing/%@", FIREBASE, groupId]];
+	//---------------------------------------------------------------------------------------------------------------------------------------------
 	[self loadMessages];
 }
 
@@ -92,8 +106,7 @@
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
 	[super viewDidAppear:animated];
-	self.collectionView.collectionViewLayout.springinessEnabled = YES;
-	timer = [NSTimer scheduledTimerWithTimeInterval:5.0 target:self selector:@selector(loadMessages) userInfo:nil repeats:YES];
+	self.collectionView.collectionViewLayout.springinessEnabled = NO;
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
@@ -101,8 +114,12 @@
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
 	[super viewWillDisappear:animated];
-	ClearRecentCounter(groupId);
-	[timer invalidate];
+	if (self.isMovingFromParentViewController)
+	{
+		ClearRecentCounter(groupId);
+		[firebase1 removeAllObservers];
+		[firebase2 removeAllObservers];
+	}
 }
 
 #pragma mark - Backend methods
@@ -111,177 +128,100 @@
 - (void)loadMessages
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	if (isLoading == NO)
+	initialized = NO;
+	self.automaticallyScrollsToMostRecentMessage = NO;
+	//---------------------------------------------------------------------------------------------------------------------------------------------
+	[firebase1 observeEventType:FEventTypeChildAdded withBlock:^(FDataSnapshot *snapshot)
 	{
-		isLoading = YES;
-		JSQMessage *message_last = [messages lastObject];
-
-		PFQuery *query = [PFQuery queryWithClassName:PF_MESSAGE_CLASS_NAME];
-		[query whereKey:PF_MESSAGE_GROUPID equalTo:groupId];
-		if (message_last != nil) [query whereKey:PF_MESSAGE_CREATEDAT greaterThan:message_last.date];
-		[query includeKey:PF_MESSAGE_USER];
-		[query orderByDescending:PF_MESSAGE_CREATEDAT];
-		[query setLimit:50];
-		[query findObjectsInBackgroundWithBlock:^(NSArray *objects, NSError *error)
+		if (initialized)
 		{
-			if (error == nil)
-			{
-				BOOL incoming = NO;
-				self.automaticallyScrollsToMostRecentMessage = NO;
-				for (PFObject *object in [objects reverseObjectEnumerator])
-				{
-					JSQMessage *message = [self addMessage:object];
-					if ([self incoming:message]) incoming = YES;
-				}
-				if ([objects count] != 0)
-				{
-					if (initialized && incoming)
-						[JSQSystemSoundPlayer jsq_playMessageReceivedSound];
-					[self finishReceivingMessage];
-					[self scrollToBottomAnimated:NO];
-				}
-				self.automaticallyScrollsToMostRecentMessage = YES;
-				initialized = YES;
-			}
-			else [ProgressHUD showError:@"Network error."];
-			isLoading = NO;
-		}];
-	}
+			BOOL incoming = [self addMessage:snapshot.value];
+			if (incoming) [JSQSystemSoundPlayer jsq_playMessageReceivedSound];
+			[self finishReceivingMessage];
+		}
+	}];
+	//---------------------------------------------------------------------------------------------------------------------------------------------
+	[firebase1 observeSingleEventOfType:FEventTypeValue withBlock:^(FDataSnapshot *snapshot)
+	{
+		[self finishReceivingMessage];
+		[self scrollToBottomAnimated:NO];
+		self.automaticallyScrollsToMostRecentMessage = YES;
+		self.showLoadEarlierMessagesHeader = YES;
+		initialized	= YES;
+	}];
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
-- (JSQMessage *)addMessage:(PFObject *)object
+- (BOOL)addMessage:(NSDictionary *)item
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	JSQMessage *message;
+	Incoming *incoming = [[Incoming alloc] initWith:self.senderId CollectionView:self.collectionView];
+	JSQMessage *message = [incoming create:item];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	PFUser *user = object[PF_MESSAGE_USER];
-	NSString *name = user[PF_USER_FULLNAME];
-	//---------------------------------------------------------------------------------------------------------------------------------------------
-	PFFile *fileVideo = object[PF_MESSAGE_VIDEO];
-	PFFile *filePicture = object[PF_MESSAGE_PICTURE];
-	//---------------------------------------------------------------------------------------------------------------------------------------------
-	if ((filePicture == nil) && (fileVideo == nil))
-	{
-		message = [[JSQMessage alloc] initWithSenderId:user.objectId senderDisplayName:name date:object.createdAt text:object[PF_MESSAGE_TEXT]];
-	}
-	//---------------------------------------------------------------------------------------------------------------------------------------------
-	if (fileVideo != nil)
-	{
-		JSQVideoMediaItem *mediaItem = [[JSQVideoMediaItem alloc] initWithFileURL:[NSURL URLWithString:fileVideo.url] isReadyToPlay:YES];
-		mediaItem.appliesMediaViewMaskAsOutgoing = [user.objectId isEqualToString:self.senderId];
-		message = [[JSQMessage alloc] initWithSenderId:user.objectId senderDisplayName:name date:object.createdAt media:mediaItem];
-	}
-	//---------------------------------------------------------------------------------------------------------------------------------------------
-	if (filePicture != nil)
-	{
-		JSQPhotoMediaItem *mediaItem = [[JSQPhotoMediaItem alloc] initWithImage:nil];
-		mediaItem.appliesMediaViewMaskAsOutgoing = [user.objectId isEqualToString:self.senderId];
-		message = [[JSQMessage alloc] initWithSenderId:user.objectId senderDisplayName:name date:object.createdAt media:mediaItem];
-		//-----------------------------------------------------------------------------------------------------------------------------------------
-		[filePicture getDataInBackgroundWithBlock:^(NSData *imageData, NSError *error)
-		{
-			if (error == nil)
-			{
-				mediaItem.image = [UIImage imageWithData:imageData];
-				[self.collectionView reloadData];
-			}
-		}];
-	}
-	//---------------------------------------------------------------------------------------------------------------------------------------------
-	[users addObject:user];
+	[items addObject:item];
 	[messages addObject:message];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	return message;
+	return [self incoming:message];
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
-- (void)loadAvatar:(PFUser *)user
+- (void)loadAvatar:(NSString *)senderId
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	PFFile *file = user[PF_USER_THUMBNAIL];
-	[file getDataInBackgroundWithBlock:^(NSData *imageData, NSError *error)
+	if (started[senderId] == nil) started[senderId] = @YES; else return;
+	//---------------------------------------------------------------------------------------------------------------------------------------------
+	PFQuery *query = [PFQuery queryWithClassName:PF_USER_CLASS_NAME];
+	[query whereKey:PF_USER_OBJECTID equalTo:senderId];
+	[query setCachePolicy:kPFCachePolicyCacheThenNetwork];
+	[query findObjectsInBackgroundWithBlock:^(NSArray *objects, NSError *error)
 	{
 		if (error == nil)
 		{
-			avatars[user.objectId] = [JSQMessagesAvatarImageFactory avatarImageWithImage:[UIImage imageWithData:imageData] diameter:30.0];
-			[self.collectionView reloadData];
+			if ([objects count] != 0)
+			{
+				PFUser *user = [objects firstObject];
+				PFFile *file = user[PF_USER_THUMBNAIL];
+				[file getDataInBackgroundWithBlock:^(NSData *imageData, NSError *error)
+				{
+					if (error == nil)
+					{
+						UIImage *image = [UIImage imageWithData:imageData];
+						avatars[senderId] = [JSQMessagesAvatarImageFactory avatarImageWithImage:image diameter:30.0];
+						[self.collectionView reloadData];
+					}
+					else [started removeObjectForKey:senderId];
+				}];
+			}
 		}
+		else if (error.code != 120) [started removeObjectForKey:senderId];
 	}];
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
-- (void)sendMessage:(NSString *)text Video:(NSURL *)video Picture:(UIImage *)picture
+- (void)messageSend:(NSString *)text Video:(NSURL *)video Picture:(UIImage *)picture Audio:(NSString *)audio
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	PFFile *fileVideo = nil;
-	PFFile *filePicture = nil;
+	Outgoing *outgoing = [[Outgoing alloc] initWith:groupId View:self.navigationController.view];
+	[outgoing send:text Video:video Picture:picture Audio:audio];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	if (video != nil)
-	{
-		text = @"[Video message]";
-		fileVideo = [PFFile fileWithName:@"video.mp4" data:[[NSFileManager defaultManager] contentsAtPath:video.path]];
-		[fileVideo saveInBackgroundWithBlock:^(BOOL succeeded, NSError *error)
-		{
-			if (error != nil) [ProgressHUD showError:@"Network error."];
-		}];
-	}
-	//---------------------------------------------------------------------------------------------------------------------------------------------
-	if (picture != nil)
-	{
-		text = @"[Picture message]";
-		filePicture = [PFFile fileWithName:@"picture.jpg" data:UIImageJPEGRepresentation(picture, 0.6)];
-		[filePicture saveInBackgroundWithBlock:^(BOOL succeeded, NSError *error)
-		{
-			if (error != nil) [ProgressHUD showError:@"Picture save error."];
-		}];
-	}
-	//---------------------------------------------------------------------------------------------------------------------------------------------
-	PFObject *object = [PFObject objectWithClassName:PF_MESSAGE_CLASS_NAME];
-	object[PF_MESSAGE_USER] = [PFUser currentUser];
-	object[PF_MESSAGE_GROUPID] = groupId;
-	object[PF_MESSAGE_TEXT] = text;
-	if (fileVideo != nil) object[PF_MESSAGE_VIDEO] = fileVideo;
-	if (filePicture != nil) object[PF_MESSAGE_PICTURE] = filePicture;
-	[object saveInBackgroundWithBlock:^(BOOL succeeded, NSError *error)
-	{
-		if (error == nil)
-		{
-			[JSQSystemSoundPlayer jsq_playMessageSentSound];
-			[self loadMessages];
-		}
-		else [ProgressHUD showError:@"Network error."];;
-	}];
-	//---------------------------------------------------------------------------------------------------------------------------------------------
-	SendPushNotification(groupId, text);
-	UpdateRecentCounter(groupId, 1, text);
-	//---------------------------------------------------------------------------------------------------------------------------------------------
+	[JSQSystemSoundPlayer jsq_playMessageSentSound];
 	[self finishSendingMessage];
 }
 
 #pragma mark - JSQMessagesViewController method overrides
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
-- (void)didPressSendButton:(UIButton *)button withMessageText:(NSString *)text senderId:(NSString *)senderId senderDisplayName:(NSString *)senderDisplayName date:(NSDate *)date
+- (void)didPressSendButton:(UIButton *)button withMessageText:(NSString *)text senderId:(NSString *)senderId senderDisplayName:(NSString *)name date:(NSDate *)date
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	[self sendMessage:text Video:nil Picture:nil];
+	[self messageSend:text Video:nil Picture:nil Audio:nil];
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 - (void)didPressAccessoryButton:(UIButton *)sender
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	[self.view endEditing:YES];
-	NSArray *menuItems = @[[[RNGridMenuItem alloc] initWithImage:[UIImage imageNamed:@"chat_camera"] title:@"Camera"],
-						   [[RNGridMenuItem alloc] initWithImage:[UIImage imageNamed:@"chat_audio"] title:@"Audio"],
-						   [[RNGridMenuItem alloc] initWithImage:[UIImage imageNamed:@"chat_pictures"] title:@"Pictures"],
-						   [[RNGridMenuItem alloc] initWithImage:[UIImage imageNamed:@"chat_videos"] title:@"Videos"],
-						   [[RNGridMenuItem alloc] initWithImage:[UIImage imageNamed:@"chat_location"] title:@"Location"],
-						   [[RNGridMenuItem alloc] initWithImage:[UIImage imageNamed:@"chat_stickers"] title:@"Stickers"]];
-	RNGridMenu *gridMenu = [[RNGridMenu alloc] initWithItems:menuItems];
-	gridMenu.delegate = self;
-	[gridMenu showInViewController:self center:CGPointMake(self.view.bounds.size.width/2.f, self.view.bounds.size.height/2.f)];
+	[self actionAttach];
 }
 
 #pragma mark - JSQMessages CollectionView DataSource
@@ -310,13 +250,13 @@
 					avatarImageDataForItemAtIndexPath:(NSIndexPath *)indexPath
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	PFUser *user = users[indexPath.item];
-	if (avatars[user.objectId] == nil)
+	JSQMessage *message = messages[indexPath.item];
+	if (avatars[message.senderId] == nil)
 	{
-		[self loadAvatar:user];
+		[self loadAvatar:message.senderId];
 		return avatarImageBlank;
 	}
-	else return avatars[user.objectId];
+	else return avatars[message.senderId];
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
@@ -355,7 +295,12 @@
 - (NSAttributedString *)collectionView:(JSQMessagesCollectionView *)collectionView attributedTextForCellBottomLabelAtIndexPath:(NSIndexPath *)indexPath
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	return nil;
+	if ([self outgoing:messages[indexPath.item]])
+	{
+		NSDictionary *item = items[indexPath.item];
+		return [[NSAttributedString alloc] initWithString:item[@"status"]];
+	}
+	else return nil;
 }
 
 #pragma mark - UICollectionView DataSource
@@ -371,17 +316,49 @@
 - (UICollectionViewCell *)collectionView:(JSQMessagesCollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	JSQMessagesCollectionViewCell *cell = (JSQMessagesCollectionViewCell *)[super collectionView:collectionView cellForItemAtIndexPath:indexPath];
+	UIColor *color = [self outgoing:messages[indexPath.item]] ? [UIColor whiteColor] : [UIColor blackColor];
 
-	if ([self outgoing:messages[indexPath.item]])
-	{
-		cell.textView.textColor = [UIColor whiteColor];
-	}
-	else
-	{
-		cell.textView.textColor = [UIColor blackColor];
-	}
+	JSQMessagesCollectionViewCell *cell = (JSQMessagesCollectionViewCell *)[super collectionView:collectionView cellForItemAtIndexPath:indexPath];
+	cell.textView.textColor = color;
+	cell.textView.linkTextAttributes = @{NSForegroundColorAttributeName:color};
+
 	return cell;
+}
+
+#pragma mark - UICollectionView Delegate
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (BOOL)collectionView:(UICollectionView *)collectionView canPerformAction:(SEL)action forItemAtIndexPath:(NSIndexPath *)indexPath
+			withSender:(id)sender
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	NSDictionary *item = items[indexPath.item];
+	//---------------------------------------------------------------------------------------------------------------------------------------------
+	if (action == @selector(actionCopy:))
+	{
+		if ([item[@"type"] isEqualToString:@"text"]) return YES;
+	}
+	if (action == @selector(actionDelete:))
+	{
+		if ([self outgoing:messages[indexPath.item]]) return YES;
+	}
+	if (action == @selector(actionSave:))
+	{
+		if ([item[@"type"] isEqualToString:@"picture"]) return YES;
+		if ([item[@"type"] isEqualToString:@"audio"]) return YES;
+		if ([item[@"type"] isEqualToString:@"video"]) return YES;
+	}
+	return NO;
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)collectionView:(UICollectionView *)collectionView performAction:(SEL)action forItemAtIndexPath:(NSIndexPath *)indexPath
+			withSender:(id)sender
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	if (action == @selector(actionCopy:))		[self actionCopy:indexPath];
+	if (action == @selector(actionDelete:))		[self actionDelete:indexPath];
+	if (action == @selector(actionSave:))		[self actionSave:indexPath];
 }
 
 #pragma mark - JSQMessages collection view flow layout delegate
@@ -424,7 +401,11 @@
 				   layout:(JSQMessagesCollectionViewFlowLayout *)collectionViewLayout heightForCellBottomLabelAtIndexPath:(NSIndexPath *)indexPath
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	return 0;
+	if ([self outgoing:messages[indexPath.item]])
+	{
+		return kJSQMessagesCollectionViewCellLabelHeightDefault;
+	}
+	else return 0;
 }
 
 #pragma mark - Responding to collection view tap events
@@ -434,7 +415,7 @@
 				header:(JSQMessagesLoadEarlierHeaderView *)headerView didTapLoadEarlierMessagesButton:(UIButton *)sender
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	NSLog(@"didTapLoadEarlierMessagesButton");
+	ActionPremium(self);
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
@@ -445,7 +426,7 @@
 	JSQMessage *message = messages[indexPath.item];
 	if ([self incoming:message])
 	{
-		ProfileView *profileView = [[ProfileView alloc] initWith:message.senderId];
+		ProfileView *profileView = [[ProfileView alloc] initWith:message.senderId User:nil];
 		[self.navigationController pushViewController:profileView animated:YES];
 	}
 }
@@ -455,6 +436,7 @@
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
 	JSQMessage *message = messages[indexPath.item];
+	//---------------------------------------------------------------------------------------------------------------------------------------------
 	if (message.isMediaMessage)
 	{
 		if ([message.media isKindOfClass:[PhotoMediaItem class]])
@@ -478,7 +460,47 @@
 - (void)collectionView:(JSQMessagesCollectionView *)collectionView didTapCellAtIndexPath:(NSIndexPath *)indexPath touchLocation:(CGPoint)touchLocation
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 {
-	NSLog(@"didTapCellAtIndexPath %@", NSStringFromCGPoint(touchLocation));
+
+}
+
+#pragma mark - User actions
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)actionAttach
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	[self.view endEditing:YES];
+	NSArray *menuItems = @[[[RNGridMenuItem alloc] initWithImage:[UIImage imageNamed:@"chat_camera"] title:@"Camera"],
+						   [[RNGridMenuItem alloc] initWithImage:[UIImage imageNamed:@"chat_audio"] title:@"Audio"],
+						   [[RNGridMenuItem alloc] initWithImage:[UIImage imageNamed:@"chat_pictures"] title:@"Pictures"],
+						   [[RNGridMenuItem alloc] initWithImage:[UIImage imageNamed:@"chat_videos"] title:@"Videos"],
+						   [[RNGridMenuItem alloc] initWithImage:[UIImage imageNamed:@"chat_location"] title:@"Location"],
+						   [[RNGridMenuItem alloc] initWithImage:[UIImage imageNamed:@"chat_stickers"] title:@"Stickers"]];
+	RNGridMenu *gridMenu = [[RNGridMenu alloc] initWithItems:menuItems];
+	gridMenu.delegate = self;
+	[gridMenu showInViewController:self center:CGPointMake(self.view.bounds.size.width/2.f, self.view.bounds.size.height/2.f)];
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)actionDelete:(NSIndexPath *)indexPath
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	ActionPremium(self);
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)actionCopy:(NSIndexPath *)indexPath
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	NSDictionary *item = items[indexPath.item];
+	[[UIPasteboard generalPasteboard] setString:item[@"text"]];
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+- (void)actionSave:(NSIndexPath *)indexPath
+//-------------------------------------------------------------------------------------------------------------------------------------------------
+{
+	ActionPremium(self);
 }
 
 #pragma mark - RNGridMenuDelegate
@@ -505,7 +527,7 @@
 	NSURL *video = info[UIImagePickerControllerMediaURL];
 	UIImage *picture = info[UIImagePickerControllerEditedImage];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
-	[self sendMessage:nil Video:video Picture:picture];
+	[self messageSend:nil Video:video Picture:picture Audio:nil];
 	//---------------------------------------------------------------------------------------------------------------------------------------------
 	[picker dismissViewControllerAnimated:YES completion:nil];
 }
